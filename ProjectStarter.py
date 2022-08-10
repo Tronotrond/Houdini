@@ -4,11 +4,30 @@ import tkinter as tk
 from tkinter import filedialog
 
 #default variables
-_projectDir = 'S:/Projects/2021/'
-_cacheDir = 'S:/Sim/'
-_uiFile = 'S:/Assets/_Tronotools/Houdini/ParticleFX-PM/ProjectStart.ui'
-_folderStructure = 'S:/Assets/_Tronotools/Houdini/ParticleFX-PM/FolderStructure.json'
+_projectDir = 'Z:/_Projects/2021/'
+_cacheDir = 'Z:/Cache/'
+_uiFile = 'Z:/_Assets/3D/0_SharedScripts/Houdini/ParticleFX-PM/ProjectStart.ui'
+_folderStructure = 'Z:/_Assets/3D/0_SharedScripts/Houdini/ParticleFX-PM/FolderStructure.json'
 _jobVariable = ""
+
+def fixpath(old_path, new_sep='/', rem_spaces=1):
+    _path = old_path.replace('\\', '/')
+    _path = _path.replace('\\\\', '/')
+    _path = _path.replace('//', '/')
+    
+    if _path.endswith('/'):
+        _path = _path[:-1]
+        
+    _path = _path.replace('/', new_sep)
+    
+    if rem_spaces:
+        _path = _path.replace(' ', '_')
+        
+    new_path = _path
+    
+    return new_path
+
+
 
 class ProjectStarter(QtWidgets.QWidget):
     def __init__(self):
@@ -55,6 +74,9 @@ class ProjectStarter(QtWidgets.QWidget):
     def createProject(self):
         prjName = self.ui.linePrjName.text()
         dir = self.ui.linePrjDir.text()
+        
+        dir = fixpath(dir)
+        
         if len(prjName) < 1:
             hou.ui.displayMessage('Please enter a project name!')
             return
@@ -77,19 +99,28 @@ class ProjectStarter(QtWidgets.QWidget):
             folders.append(item)            
         
         #create the folders
-        print 'Creating folder structure at ' + prjPath
+        winpath = fixpath(prjPath, new_sep='\\')
+        print ('Creating folder structure at ' + winpath)
 
         for folder in folders:
             os.makedirs(prjPath + folder)
             #print prjPath + folder
         #setup the variables
         self.setupVariables()
-        print 'done!'
+        print ('done!')
         
     #keep things updated as project name is changed
     def projectNameChanged(self):
         dir = self.ui.linePrjDir.text()
         prjName = self.ui.linePrjName.text()
+        
+        # Remove spaces and backslashes and update UI
+        dir = fixpath(dir)
+        prjName = fixpath(prjName)
+        
+        self.ui.linePrjDir.setText(dir)
+        self.ui.linePrjName.setText(prjName)
+        
         _jobVariable = dir + "/" + prjName
         self.ui.tableVariables.setItem(0,1, QtWidgets.QTableWidgetItem(_jobVariable))
         self.ui.tableVariables.setItem(1,1, QtWidgets.QTableWidgetItem(prjName))
