@@ -9,6 +9,8 @@ _cacheDir = 'Z:/Cache/'
 _uiFile = 'Z:/_Assets/3D/0_SharedScripts/Houdini/ParticleFX-PM/ProjectStart.ui'
 _folderStructure = 'Z:/_Assets/3D/0_SharedScripts/Houdini/ParticleFX-PM/FolderStructure.json'
 _jobVariable = ""
+# FPS Controls to be implemented
+_FPS = hou.fps()
 
 def fixpath(old_path, new_sep='/', rem_spaces=1):
     _path = old_path.replace('\\', '/')
@@ -108,6 +110,10 @@ class ProjectStarter(QtWidgets.QWidget):
         #setup the variables
         self.setupVariables()
         print ('done!')
+        
+        if hou.ui.displayMessage('Project created!', buttons=('OK', 'Open in Explorer')) == 1:
+            os.startfile(winpath)
+        
         
     #keep things updated as project name is changed
     def projectNameChanged(self):
