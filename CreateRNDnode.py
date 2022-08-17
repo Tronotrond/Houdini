@@ -24,7 +24,7 @@ def GetNodeByDialog():
         
     return None
 
-if len(nodes) is not 1:
+if len(nodes) != 1:
     node = GetNodeByDialog()
 else:
     t = nodes[0].type()
