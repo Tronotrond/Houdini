@@ -27,7 +27,7 @@ def GetNodeByDialog():
     
 def AskForName(initial_name=''):
     input = hou.ui.readInput('Render node name', initial_contents=initial_name, close_choice=1, buttons=('OK', 'Cancel'))
-    print(input)
+    #print(input)
     if(input == None or input[0] != 0):
         return None
         
