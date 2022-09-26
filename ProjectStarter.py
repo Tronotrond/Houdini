@@ -4,11 +4,13 @@ import tkinter as tk
 from tkinter import filedialog
 
 #default variables
-_projectDir = 'Z:/_Projects/2021/'
-_cacheDir = 'Z:/Cache/'
-_uiFile = 'Z:/_Assets/3D/0_SharedScripts/Houdini/ParticleFX-PM/ProjectStart.ui'
-_folderStructure = 'Z:/_Assets/3D/0_SharedScripts/Houdini/ParticleFX-PM/FolderStructure.json'
-_jobVariable = ""
+_projectDir = r'Z:/_Projects/2021/'
+_cacheDir = r'Z:/Cache/'
+_uiFile = r'Z:/_Assets/3D/0_SharedScripts/Houdini/ParticleFX-PM/ProjectStart.ui'
+_folderStructure = r'Z:/_Assets/3D/0_SharedScripts/Houdini/ParticleFX-PM/FolderStructure.json'
+_lastProjectFile = os.path.join(os.path.expanduser("~"), '.tronotools', 'lastprojects.json')
+_maxProjectsToSave = 5
+_jobVariable = ''
 # FPS Controls to be implemented
 _FPS = hou.fps()
 
@@ -28,54 +30,92 @@ def fixpath(old_path, new_sep='/', rem_spaces=1):
     new_path = _path
     
     return new_path
+    
+    
+def loadjson(file):
+    #Create lastproject json file if not exists
+    if not os.path.isfile(file):
+        dir = os.path.dirname(os.path.abspath(file))
+        if not os.path.exists(dir):
+            os.mkdir(dir)
+        with open(file, 'w') as file:
+            print('Created user config file: ' + str(file))
 
-
+    try:
+        with open(file, 'r') as f:
+            #print('loading json')
+            data = json.load(f)
+    except:
+        #print('Some error loading json file: ' + file)
+        data = []
+        
+    return data
+    
+        
+def savejson(file, data):
+    with open(file, 'w') as file:
+        json.dump(data, file, indent=4)
+        
 
 class ProjectStarter(QtWidgets.QWidget):
+    _qBoxActivated = 0
+    _lastProjectsList = []
     def __init__(self):
+        
         super(ProjectStarter,self).__init__()
         self.ui = QtUiTools.QUiLoader().load(_uiFile, parentWidget=self)
         self.setParent(hou.ui.mainQtWindow(), QtCore.Qt.Window)
         
         # initialize ui
+        self.ui.linePrjId.textChanged.connect(self.projectNameChanged)
         self.ui.linePrjName.textChanged.connect(self.projectNameChanged)
         self.ui.linePrjDir.textChanged.connect(self.projectNameChanged)
-        
-        
-        
-         
+        self.ui.lastProjects.currentIndexChanged.connect(self.lastProjectChanged)
+             
+
         if hou.hscriptExpression("isvariable(PRJ)") == 1:
-            prjVar = hou.hscriptExpression("$PRJ")
+            prjName = hou.hscriptExpression("$PRJ")
         else:
-            prjVar = ""
+            prjName = ""
+
         
-        
-        # check if a job varaible is already set and use it to fill the UI
+        # check if a job varaible is already set and use it to fill the UI      
         if hou.hscriptExpression("isvariable(JOB)") == 1:
             jobVar = hou.hscriptExpression("$JOB")
             jobArray = jobVar.split("/")
-            prjVar = jobArray[len(jobArray)-1]
+            prjName = jobArray[len(jobArray)-1]
             head, tail = os.path.split(jobVar)
-            _projectDir = head
-
-
+            projectDir = head
+        if hou.hscriptExpression("isvariable(PRJID)") == 1 and hou.hscriptExpression("isvariable(PRJNAME)") == 1:
+            id = hou.hscriptExpression("$PRJID")
+            prjName = hou.hscriptExpression("$PRJNAME") 
+            if id != 'replaceme':
+                self.ui.linePrjId.setText(id)
+                
         
         # Fill UI input fields
-        self.ui.linePrjDir.setText(_projectDir)
+        self.ui.linePrjName.setText(prjName)
+        self.ui.linePrjDir.setText(projectDir)
         self.updateVariableTable()
-        self.ui.linePrjName.setText(prjVar)
+        self.ui.linePrjName.setText(prjName)
                 
         # Setup "Create Project" button
         self.ui.btnCreateProject.clicked.connect(self.createProject)
         self.ui.btnBrowse.clicked.connect(self.browseDirs)
         self.ui.btnSetupVariables.clicked.connect(self.setupVariables)
     
+        #Load last projects list
+        self.loadPrjList()
         
         
     #Create Project functions
     def createProject(self):
+        prjId = self.ui.linePrjId.text()
         prjName = self.ui.linePrjName.text()
         dir = self.ui.linePrjDir.text()
+        
+        if prjId != '':
+            prjName = prjId + '-' + prjName
         
         dir = fixpath(dir)
         
@@ -93,8 +133,7 @@ class ProjectStarter(QtWidgets.QWidget):
         folders = []
         
         #load the json with folder structure
-        with open(_folderStructure) as f:
-            data = json.load(f)
+        data = loadjson(_folderStructure)
         
         #create the array of folders
         for item in data['folders']:
@@ -109,6 +148,29 @@ class ProjectStarter(QtWidgets.QWidget):
             #print prjPath + folder
         #setup the variables
         self.setupVariables()
+        
+        self._lastProjectsList = loadjson(_lastProjectFile)
+        
+        #Save project to last projects list
+        prj_data = {
+            
+                'prjId': self.ui.linePrjId.text(),
+                'prjName': self.ui.linePrjName.text(),
+                'prjPath': dir,
+                'outPath': self.ui.tableVariables.item(2,1).text(),
+                'cachePath': self.ui.tableVariables.item(3,1).text(),
+            }
+        prj_name = prj_data['prjId'] + '-' + prj_data['prjName']
+        newprj = []
+        newprj.append(prj_name)
+        newprj.append(prj_data)
+        self._lastProjectsList.insert(0, newprj)
+        
+        #Save project list
+        savejson(_lastProjectFile, self._lastProjectsList[:_maxProjectsToSave])
+        #Refresh dropdown list
+        self.loadPrjList()
+        
         print ('done!')
         
         if hou.ui.displayMessage('Project created!', buttons=('OK', 'Open in Explorer')) == 1:
@@ -118,14 +180,22 @@ class ProjectStarter(QtWidgets.QWidget):
     #keep things updated as project name is changed
     def projectNameChanged(self):
         dir = self.ui.linePrjDir.text()
+        prjId = self.ui.linePrjId.text()
         prjName = self.ui.linePrjName.text()
         
         # Remove spaces and backslashes and update UI
         dir = fixpath(dir)
+        prjId = fixpath(prjId)
         prjName = fixpath(prjName)
         
+        
+
         self.ui.linePrjDir.setText(dir)
+        self.ui.linePrjId.setText(prjId)
         self.ui.linePrjName.setText(prjName)
+        
+        if prjId != '':
+            prjName = prjId + '-' + prjName
         
         _jobVariable = dir + "/" + prjName
         self.ui.tableVariables.setItem(0,1, QtWidgets.QTableWidgetItem(_jobVariable))
@@ -147,27 +217,61 @@ class ProjectStarter(QtWidgets.QWidget):
         
     def updateVariableTable(self):
         #print self.ui.tableVariables.item(0,0).text()
-        jobVar = hou.hscriptExpression("$JOB")
+        jobVar = hou.hscriptExpression('$JOB')
         self.ui.tableVariables.setItem(0,1, QtWidgets.QTableWidgetItem(jobVar))
         
     def setupVariables(self):
+        name = self.ui.linePrjName.text()
+        id = self.ui.linePrjId.text()
         jobVarUI = self.ui.tableVariables.item(0,1).text()
         prjVarUI = self.ui.tableVariables.item(1,1).text()
         outVarUI = self.ui.tableVariables.item(2,1).text()
         cacheVarUI = self.ui.tableVariables.item(3,1).text()
         
         #CREATE THE VARIABLES FIRST TO BE ABLE TO WRITE THEM AND SEE THEM IN THE VARIABLE PANEL
-        hou.hscript("setenv JOB = replaceme")
-        hou.hscript("setenv PRJ = replaceme")
-        hou.hscript("setenv OUT = replaceme")
-        hou.hscript("setenv CACHE = replaceme")
+        hou.hscript('setenv JOB = replaceme')
+        hou.hscript('setenv PRJID = replaceme')
+        hou.hscript('setenv PRJNAME = replaceme')
+        hou.hscript('setenv PRJ = replaceme')
+        hou.hscript('setenv OUT = replaceme')
+        hou.hscript('setenv CACHE = replaceme')
             
         hou.putenv('JOB', jobVarUI)
+        hou.putenv('PRJID', id)
+        hou.putenv('PRJNAME', name)
         hou.putenv('PRJ', prjVarUI)
         hou.putenv('OUT', outVarUI)
         hou.putenv('CACHE', cacheVarUI)
-        self.checkVariables()
         
+        self.checkVariables()
+       
+    def loadPrjList(self):
+        self._lastProjectsList = loadjson(_lastProjectFile)
+        
+        names = []
+        for item in self._lastProjectsList:
+            names.append(item[0])
+            
+        # Clear old items and add project names to dropbox
+        self.ui.lastProjects.clear()
+        self.ui.lastProjects.addItems(names)
+        
+    def lastProjectChanged(self, s):
+        #Function triggers as list populates. Avoid running the code on first run
+        if self._qBoxActivated == 0:
+            self._qBoxActivated = 1
+            return
+            
+        prjdata = self._lastProjectsList[s][1]
+        self.ui.linePrjId.setText(prjdata['prjId'])
+        self.ui.linePrjName.setText(prjdata['prjName'])
+        self.ui.linePrjDir.setText(prjdata['prjPath'])
+        self.ui.tableVariables.setItem(0,1, QtWidgets.QTableWidgetItem(prjdata['prjPath'] + '/' + prjdata['prjId'] + '-' + prjdata['prjName']))
+        self.ui.tableVariables.setItem(1,1, QtWidgets.QTableWidgetItem(prjdata['prjId'] + '-' + prjdata['prjName']))
+        self.ui.tableVariables.setItem(2,1, QtWidgets.QTableWidgetItem(prjdata['outPath']))
+        self.ui.tableVariables.setItem(3,1, QtWidgets.QTableWidgetItem(prjdata['cachePath']))
+        
+        self.checkVariables()
     
     def checkVariables(self):
         #Have to check if variables exists, to avoid undefined error
@@ -179,6 +283,14 @@ class ProjectStarter(QtWidgets.QWidget):
             prjVar = hou.hscriptExpression("$PRJ")
         else:
             prjVar = ""
+        if hou.hscriptExpression("isvariable(PRJID)") == 1:
+            idVar = hou.hscriptExpression("$PRJID")
+        else:
+            idVar = ""
+        if hou.hscriptExpression("isvariable(PRJNAME)") == 1:
+            nameVar = hou.hscriptExpression("$PRJNAME")
+        else:
+            nameVar = ""
         if hou.hscriptExpression("isvariable(OUT)") == 1:
             outVar = hou.hscriptExpression("$OUT")
         else:
@@ -212,5 +324,9 @@ class ProjectStarter(QtWidgets.QWidget):
         else:
             self.ui.tableVariables.item(3,1).setForeground(QtGui.QBrush(QtGui.QColor(255, 0, 0)))
 
+        
+
+
+           
 win = ProjectStarter()
 win.show()
