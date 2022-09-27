@@ -2,36 +2,14 @@ import hou, os, json
 from PySide2 import QtCore, QtUiTools, QtWidgets, QtGui
 import tkinter as tk
 from tkinter import filedialog
+from tronoutils import main as utils
 
-#default variables
-_projectDir = r'Z:/_Projects/2021/'
-_cacheDir = r'Z:/Cache/'
-_uiFile = r'Z:/_Assets/3D/0_SharedScripts/Houdini/ParticleFX-PM/ProjectStart.ui'
-_folderStructure = r'Z:/_Assets/3D/0_SharedScripts/Houdini/ParticleFX-PM/FolderStructure.json'
+# default variables
+_uiFile = r'S:/Assets/Houdini/Scripts/projectstarter/ProjectStart.ui'
+_configfile = r'S:/Assets/Houdini/Scripts/projectstarter/FolderStructure.json'
 _lastProjectFile = os.path.join(os.path.expanduser("~"), '.tronotools', 'lastprojects.json')
 _maxProjectsToSave = 5
-_jobVariable = ''
-# FPS Controls to be implemented
-_FPS = hou.fps()
 
-def fixpath(old_path, new_sep='/', rem_spaces=1):
-    _path = old_path.replace('\\', '/')
-    _path = _path.replace('\\\\', '/')
-    _path = _path.replace('//', '/')
-    
-    if _path.endswith('/'):
-        _path = _path[:-1]
-        
-    _path = _path.replace('/', new_sep)
-    
-    if rem_spaces:
-        _path = _path.replace(' ', '_')
-        
-    new_path = _path
-    
-    return new_path
-    
-    
 def loadjson(file):
     #Create lastproject json file if not exists
     if not os.path.isfile(file):
@@ -58,14 +36,29 @@ def savejson(file, data):
         
 
 class ProjectStarter(QtWidgets.QWidget):
+    data = None
+    _projectDir = None
+    _cacheDir = None
+    _assetDir = None
+    _jobVariable = None
     _qBoxActivated = 0
     _lastProjectsList = []
+    # FPS Controls to be implemented
+    _FPS = hou.fps()
+
     def __init__(self):
-        
-        super(ProjectStarter,self).__init__()
+        super(ProjectStarter, self).__init__()
+        if self.startupChecks() == -1:
+            return
+            
         self.ui = QtUiTools.QUiLoader().load(_uiFile, parentWidget=self)
         self.setParent(hou.ui.mainQtWindow(), QtCore.Qt.Window)
-        
+
+        self.data = loadjson(_configfile)
+        self._projectDir = self.data['projectroot']
+        self._cacheDir = self.data['cachedir']
+        self._assetDir = self.data['assetdir']
+
         # initialize ui
         self.ui.linePrjId.textChanged.connect(self.projectNameChanged)
         self.ui.linePrjName.textChanged.connect(self.projectNameChanged)
@@ -106,9 +99,19 @@ class ProjectStarter(QtWidgets.QWidget):
     
         #Load last projects list
         self.loadPrjList()
-        
-        
+
+    
     #Create Project functions
+    def startupChecks(self):
+        if not os.path.exists(_uiFile):
+            print('UI File does not exist:\n' + _uiFile)
+            return -1
+        if not os.path.exists(_configfile):
+            print('Config File does not exist:\n' + _configfile)
+            return -1
+            
+        return 1
+    
     def createProject(self):
         prjId = self.ui.linePrjId.text()
         prjName = self.ui.linePrjName.text()
@@ -117,7 +120,7 @@ class ProjectStarter(QtWidgets.QWidget):
         if prjId != '':
             prjName = prjId + '-' + prjName
         
-        dir = fixpath(dir)
+        dir = utils.fixpath(dir)
         
         if len(prjName) < 1:
             hou.ui.displayMessage('Please enter a project name!')
@@ -140,7 +143,7 @@ class ProjectStarter(QtWidgets.QWidget):
             folders.append(item)            
         
         #create the folders
-        winpath = fixpath(prjPath, new_sep='\\')
+        winpath = utils.fixpath(prjPath, new_sep='\\')
         print ('Creating folder structure at ' + winpath)
 
         for folder in folders:
@@ -184,9 +187,9 @@ class ProjectStarter(QtWidgets.QWidget):
         prjName = self.ui.linePrjName.text()
         
         # Remove spaces and backslashes and update UI
-        dir = fixpath(dir)
-        prjId = fixpath(prjId)
-        prjName = fixpath(prjName)
+        dir = utils.fixpath(dir)
+        prjId = utils.fixpath(prjId)
+        prjName = utils.fixpath(prjName)
         
         
 
@@ -201,7 +204,7 @@ class ProjectStarter(QtWidgets.QWidget):
         self.ui.tableVariables.setItem(0,1, QtWidgets.QTableWidgetItem(_jobVariable))
         self.ui.tableVariables.setItem(1,1, QtWidgets.QTableWidgetItem(prjName))
         self.ui.tableVariables.setItem(2,1, QtWidgets.QTableWidgetItem(dir + "/" + prjName + "/_Frames/0_RAW/"))
-        self.ui.tableVariables.setItem(3,1, QtWidgets.QTableWidgetItem(_cacheDir + prjName + "/"))
+        self.ui.tableVariables.setItem(3,1, QtWidgets.QTableWidgetItem(self._cacheDir + prjName + "/"))
         
         
         self.checkVariables()
@@ -324,9 +327,5 @@ class ProjectStarter(QtWidgets.QWidget):
         else:
             self.ui.tableVariables.item(3,1).setForeground(QtGui.QBrush(QtGui.QColor(255, 0, 0)))
 
-        
-
-
-           
-win = ProjectStarter()
-win.show()
+#win = ProjectStarter()
+#win.show()
