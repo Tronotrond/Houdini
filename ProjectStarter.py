@@ -40,6 +40,8 @@ class ProjectStarter(QtWidgets.QWidget):
     _projectDir = None
     _cacheDir = None
     _assetDir = None
+    _hdaDir = None
+    _scriptDir = None
     _jobVariable = None
     _qBoxActivated = 0
     _lastProjectsList = []
@@ -58,6 +60,8 @@ class ProjectStarter(QtWidgets.QWidget):
         self._projectDir = self.data['projectroot']
         self._cacheDir = self.data['cachedir']
         self._assetDir = self.data['assetdir']
+        self._hdaDir = self.data['hdadir']
+        self._scriptDir = self.data['scriptdir']
 
         # initialize ui
         self.ui.linePrjId.textChanged.connect(self.projectNameChanged)
@@ -70,7 +74,7 @@ class ProjectStarter(QtWidgets.QWidget):
             prjName = hou.hscriptExpression("$PRJ")
         else:
             prjName = ""
-
+    
         
         # check if a job varaible is already set and use it to fill the UI      
         if hou.hscriptExpression("isvariable(JOB)") == 1:
@@ -85,6 +89,14 @@ class ProjectStarter(QtWidgets.QWidget):
             if id != 'replaceme':
                 self.ui.linePrjId.setText(id)
                 
+        #Append to and adjust table
+        self.ui.tableVariables.setColumnWidth(1, 500)
+        rowPosition = self.ui.tableVariables.rowCount()
+        self.ui.tableVariables.insertRow(rowPosition)
+        self.ui.tableVariables.setItem(rowPosition, 0, QtWidgets.QTableWidgetItem('HDA'))
+        rowPosition += 1
+        self.ui.tableVariables.insertRow(rowPosition)
+        self.ui.tableVariables.setItem(rowPosition, 0, QtWidgets.QTableWidgetItem('SCRIPTS'))
         
         # Fill UI input fields
         self.ui.linePrjName.setText(prjName)
@@ -136,7 +148,7 @@ class ProjectStarter(QtWidgets.QWidget):
         folders = []
         
         #load the json with folder structure
-        data = loadjson(_folderStructure)
+        data = loadjson(_configfile)
         
         #create the array of folders
         for item in data['folders']:
@@ -162,6 +174,8 @@ class ProjectStarter(QtWidgets.QWidget):
                 'prjPath': dir,
                 'outPath': self.ui.tableVariables.item(2,1).text(),
                 'cachePath': self.ui.tableVariables.item(3,1).text(),
+                'hdaPath': self.ui.tableVariables.item(4,1).text(),
+                'scriptPath': self.ui.tableVariables.item(5,1).text(),
             }
         prj_name = prj_data['prjId'] + '-' + prj_data['prjName']
         newprj = []
@@ -204,7 +218,9 @@ class ProjectStarter(QtWidgets.QWidget):
         self.ui.tableVariables.setItem(0,1, QtWidgets.QTableWidgetItem(_jobVariable))
         self.ui.tableVariables.setItem(1,1, QtWidgets.QTableWidgetItem(prjName))
         self.ui.tableVariables.setItem(2,1, QtWidgets.QTableWidgetItem(dir + "/" + prjName + "/_Frames/0_RAW/"))
-        self.ui.tableVariables.setItem(3,1, QtWidgets.QTableWidgetItem(self._cacheDir + prjName + "/"))
+        self.ui.tableVariables.setItem(3,1, QtWidgets.QTableWidgetItem(self._cacheDir + "/" + prjName + "/"))
+        self.ui.tableVariables.setItem(4,1, QtWidgets.QTableWidgetItem(dir + "/" + prjName + "/" + self._hdaDir))
+        self.ui.tableVariables.setItem(5,1, QtWidgets.QTableWidgetItem(dir + "/" + prjName + "/" + self._scriptDir))
         
         
         self.checkVariables()
@@ -230,6 +246,8 @@ class ProjectStarter(QtWidgets.QWidget):
         prjVarUI = self.ui.tableVariables.item(1,1).text()
         outVarUI = self.ui.tableVariables.item(2,1).text()
         cacheVarUI = self.ui.tableVariables.item(3,1).text()
+        hdaVarUI = self.ui.tableVariables.item(4,1).text()
+        scriptVarUI = self.ui.tableVariables.item(5,1).text()
         
         #CREATE THE VARIABLES FIRST TO BE ABLE TO WRITE THEM AND SEE THEM IN THE VARIABLE PANEL
         hou.hscript('setenv JOB = replaceme')
@@ -238,6 +256,8 @@ class ProjectStarter(QtWidgets.QWidget):
         hou.hscript('setenv PRJ = replaceme')
         hou.hscript('setenv OUT = replaceme')
         hou.hscript('setenv CACHE = replaceme')
+        hou.hscript('setenv PRJHDA = replaceme')
+        hou.hscript('setenv PRJSCRIPT = replaceme')
             
         hou.putenv('JOB', jobVarUI)
         hou.putenv('PRJID', id)
@@ -245,6 +265,8 @@ class ProjectStarter(QtWidgets.QWidget):
         hou.putenv('PRJ', prjVarUI)
         hou.putenv('OUT', outVarUI)
         hou.putenv('CACHE', cacheVarUI)
+        hou.putenv('PRJHDA', hdaVarUI)
+        hou.putenv('PRJSCRIPT', scriptVarUI)
         
         self.checkVariables()
        
@@ -302,10 +324,21 @@ class ProjectStarter(QtWidgets.QWidget):
             cacheVar = hou.hscriptExpression("$CACHE")
         else:
             cacheVar = ""
+        if hou.hscriptExpression("isvariable(PRJHDA)") == 1:
+            hdaVar = hou.hscriptExpression("$PRJHDA")
+        else:
+            hdaVar = ""
+        if hou.hscriptExpression("isvariable(PRJSCRIPT)") == 1:
+            scriptVar = hou.hscriptExpression("$PRJSCRIPT")
+        else:
+           scriptVar = ""
+        
         jobVarUI = self.ui.tableVariables.item(0,1).text()
         prjVarUI = self.ui.tableVariables.item(1,1).text()
         outVarUI = self.ui.tableVariables.item(2,1).text()
         cacheVarUI = self.ui.tableVariables.item(3,1).text()
+        hdaVarUI = self.ui.tableVariables.item(4,1).text()
+        scriptVarUI = self.ui.tableVariables.item(5,1).text()
         
         if jobVar == jobVarUI:        
             self.ui.tableVariables.item(0,1).setForeground(QtGui.QBrush(QtGui.QColor(0, 255, 0)))
@@ -326,6 +359,16 @@ class ProjectStarter(QtWidgets.QWidget):
             self.ui.tableVariables.item(3,1).setForeground(QtGui.QBrush(QtGui.QColor(0, 255, 0)))
         else:
             self.ui.tableVariables.item(3,1).setForeground(QtGui.QBrush(QtGui.QColor(255, 0, 0)))
+            
+        if hdaVar == hdaVarUI:        
+            self.ui.tableVariables.item(4,1).setForeground(QtGui.QBrush(QtGui.QColor(0, 255, 0)))
+        else:
+            self.ui.tableVariables.item(4,1).setForeground(QtGui.QBrush(QtGui.QColor(255, 0, 0)))
+            
+        if scriptVar == scriptVarUI:        
+            self.ui.tableVariables.item(5,1).setForeground(QtGui.QBrush(QtGui.QColor(0, 255, 0)))
+        else:
+            self.ui.tableVariables.item(5,1).setForeground(QtGui.QBrush(QtGui.QColor(255, 0, 0)))
 
 #win = ProjectStarter()
 #win.show()
