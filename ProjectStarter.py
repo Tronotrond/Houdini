@@ -1,3 +1,4 @@
+import sys
 import hou, os, json
 from PySide2 import QtCore, QtUiTools, QtWidgets, QtGui
 import tkinter as tk
@@ -41,6 +42,7 @@ class ProjectStarter(QtWidgets.QWidget):
     _cacheDir = None
     _assetDir = None
     _hdaDir = None
+    _hdaGlobalDir = None
     _scriptDir = None
     _jobVariable = None
     _qBoxActivated = 0
@@ -62,6 +64,7 @@ class ProjectStarter(QtWidgets.QWidget):
         self._assetDir = self.data['assetdir']
         self._hdaDir = self.data['hdadir']
         self._scriptDir = self.data['scriptdir']
+        self._hdaGlobalDir = self.data['hdaglobaldir']
 
         # initialize ui
         self.ui.linePrjId.textChanged.connect(self.projectNameChanged)
@@ -268,6 +271,23 @@ class ProjectStarter(QtWidgets.QWidget):
         hou.putenv('PRJHDA', hdaVarUI)
         hou.putenv('PRJSCRIPT', scriptVarUI)
         
+        # Update houdini internal search paths
+        # Append project script directory (TODO: Remove when changing projects)
+        sys.path.append(self._scriptDir)
+        
+        # Build HDA search path
+        hda_paths = [
+            '$HH/otls',
+            hdaVarUI,
+            self._hdaGlobalDir,
+        ]
+        
+        hou.putenv('HOUDINI_OTLSCAN_PATH', ';'.join(hda_paths)) 
+        
+        
+        hou.hda.reloadAllFiles()
+               
+        
         self.checkVariables()
        
     def loadPrjList(self):
@@ -370,5 +390,5 @@ class ProjectStarter(QtWidgets.QWidget):
         else:
             self.ui.tableVariables.item(5,1).setForeground(QtGui.QBrush(QtGui.QColor(255, 0, 0)))
 
-#win = ProjectStarter()
-#win.show()
+win = ProjectStarter()
+win.show()
