@@ -31,7 +31,7 @@ def CreateMaterial(matnet, matname, mattype='redshift_vopnet', skipexisting='Tru
 
 def remove_illegal_characters(string):
     # Define the pattern of illegal characters using regular expressions
-    pattern = r'[#^!@]'
+    pattern = r'[#^!@()*&%$]'
 
     cleaned_string = re.sub(pattern, '', string)
     cleaned_string = re.sub(' ', '_', cleaned_string)
