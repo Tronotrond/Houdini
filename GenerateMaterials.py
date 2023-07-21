@@ -1,6 +1,6 @@
 ######################################################
 ##
-##  Generate materials from shop_materialpath v1.1
+##  Generate materials from shop_materialpath v1.11
 ##  Trond Hille 2023
 ##
 ##  FBX and external models often come in with material paths set, but recreating the materials is a manual process.
@@ -12,6 +12,7 @@
 ##  v1.0    initial release. Redshift Materials Only
 ##  v1.1    added support and choice for different render engines/material types 
 ##                Added support for Karma MaterialX and ease to add more later
+##  v1.11   Enabled the output material flag to be enabled by default on new MtlX subnets
 ##
 ##
 ##
@@ -89,6 +90,8 @@ def CreateKarmaMtlx(matnet, matname):
     displacementoutput.parm('connectorkind').eval()
     displacementoutput.setPosition(pos)
         
+    matvopnet.setMaterialFlag(1)
+    
     return matvopnet
     
 
