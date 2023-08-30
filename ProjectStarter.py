@@ -1,15 +1,25 @@
-import sys
 import hou, os, json
-from PySide2 import QtCore, QtUiTools, QtWidgets, QtGui
+import sys
+import re
+
+try:
+    import PySide2_External #hacky internal fix for missing PySide QtUiUTils in Houdini 
+except:
+    print('Hack fix: PySide2_External not found')
+    
+from PySide2 import QtCore, QtUiTools, QtWidgets, QtGui 
+from PySide2.QtUiTools import QUiLoader
 import tkinter as tk
 from tkinter import filedialog
 from tronoutils import main as utils
 
 # default variables
-_uiFile = r'S:/Assets/Houdini/Scripts/projectstarter/ProjectStart.ui'
-_configfile = r'S:/Assets/Houdini/Scripts/projectstarter/FolderStructure.json'
+_uiFile = r'Z:/_Assets/3D/0_SharedScripts/Houdini/py_scripts/projectstarter/ProjectStart.ui'
+_configfile = r'Z:/_Assets/3D/0_SharedScripts/Houdini/py_scripts/projectstarter/FolderStructure.json'
 _lastProjectFile = os.path.join(os.path.expanduser("~"), '.tronotools', 'lastprojects.json')
-_maxProjectsToSave = 5
+_maxProjectsToSave = 10
+_prjRegEx = r"(?P<prjid>\d\d-\w{3,}-.*-\d{4,})(-|_)(?P<prjname>.*)"
+
 
 def loadjson(file):
     #Create lastproject json file if not exists
@@ -55,7 +65,7 @@ class ProjectStarter(QtWidgets.QWidget):
         if self.startupChecks() == -1:
             return
             
-        self.ui = QtUiTools.QUiLoader().load(_uiFile, parentWidget=self)
+        self.ui = QUiLoader().load(_uiFile, parentWidget=self)
         self.setParent(hou.ui.mainQtWindow(), QtCore.Qt.Window)
 
         self.data = loadjson(_configfile)
@@ -235,7 +245,22 @@ class ProjectStarter(QtWidgets.QWidget):
         root.withdraw()
 
         file_path = filedialog.askdirectory()
-        self.ui.linePrjDir.setText(file_path)
+        
+        #REGEX path and break down according to set regex variable
+        path = os.path.normpath(file_path)
+        last_directory = os.path.basename(path)
+        directories_up_to_last = path.replace(last_directory, '', 1)
+        #patharray = [directories_up_to_last, last_directory]
+        
+        match = re.match(_prjRegEx, last_directory)
+        if match:
+            self.ui.linePrjDir.setText(directories_up_to_last)
+            self.ui.linePrjId.setText(match.group('prjid'))
+            self.ui.linePrjName.setText(match.group('prjname'))
+        else:
+            self.ui.linePrjDir.setText(directories_up_to_last)
+            self.ui.linePrjId.setText('')
+            self.ui.linePrjName.setText(last_directory)
         
     def updateVariableTable(self):
         #print self.ui.tableVariables.item(0,0).text()
@@ -286,6 +311,31 @@ class ProjectStarter(QtWidgets.QWidget):
         
         
         hou.hda.reloadAllFiles()
+        
+        self._lastProjectsList = loadjson(_lastProjectFile)
+        
+        #Save project to last projects list
+        prj_data = {
+            
+                'prjId': self.ui.linePrjId.text(),
+                'prjName': self.ui.linePrjName.text(),
+                'prjPath': self.ui.linePrjDir.text(),
+                'outPath': self.ui.tableVariables.item(2,1).text(),
+                'cachePath': self.ui.tableVariables.item(3,1).text(),
+                'hdaPath': self.ui.tableVariables.item(4,1).text(),
+                'scriptPath': self.ui.tableVariables.item(5,1).text(),
+            }
+        prj_name = prj_data['prjId'] + '-' + prj_data['prjName']
+        newprj = []
+        newprj.append(prj_name)
+        newprj.append(prj_data)
+        self._lastProjectsList.insert(0, newprj)
+        
+        #Save project list
+        savejson(_lastProjectFile, self._lastProjectsList[:_maxProjectsToSave])
+        #Refresh dropdown list
+        self.loadPrjList()
+        
                
         
         self.checkVariables()
